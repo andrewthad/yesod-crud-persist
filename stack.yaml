@@ -1,0 +1,6 @@
+flags:
+  yesod-crud-persist: {}
+packages:
+- '.'
+extra-deps: []
+resolver: lts-2.14

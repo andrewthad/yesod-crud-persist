@@ -1,0 +1,32 @@
+module Yesod.Crud.Internal where
+
+-- import ClassyPrelude.Yesod
+-- import Yesod.Core
+-- import Yesod.Core.Types
+-- import qualified Network.Wai as W
+-- 
+-- subHelper :: Monad m 
+--           => HandlerT child (HandlerT parent m) TypedContent
+--           -> YesodSubRunnerEnv child parent (HandlerT parent m)
+--           -> Maybe (Route child)
+--           -> W.Application
+-- subHelper handlert YesodSubRunnerEnv {..} route =
+--     ysreParentRunner base ysreParentEnv (fmap ysreToParentRoute route)
+--   where
+--     base = stripHandlerT (fmap toTypedContent handlert) ysreGetSub ysreToParentRoute route
+-- 
+-- stripHandlerT :: HandlerT child (HandlerT parent m) a
+--               -> (parent -> child)
+--               -> (Route child -> Route parent)
+--               -> Maybe (Route child)
+--               -> HandlerT parent m a
+-- stripHandlerT (HandlerT f) getSub toMaster newRoute = HandlerT $ \hd -> do
+--     let env = handlerEnv hd
+--     ($ hd) $ unHandlerT $ f hd
+--         { handlerEnv = env
+--             { rheSite = getSub $ rheSite env
+--             , rheRoute = newRoute
+--             , rheRender = \url params -> rheRender env (toMaster url) params
+--             }
+--         , handlerToParent = toMaster
+--         }
