@@ -1,5 +1,42 @@
 module Yesod.Crud.Internal where
 
+import Control.Monad.Trans.State (StateT, evalStateT, put, get)
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import Data.Functor.Identity
+import Control.Monad
+import Yesod.Core
+import Control.Applicative
+import Data.Text (Text)
+
+runSM :: [Text] -> StateT [Text] (MaybeT Identity) a -> Maybe a
+runSM xs a = runIdentity $ runMaybeT $ evalStateT (a <* forceEmpty) xs
+
+consumeMatchingText :: Text -> StateT [Text] (MaybeT Identity) ()
+consumeMatchingText t = do
+  p <- attemptTakeNextPiece
+  guard $ p == t
+
+consumeKey :: PathPiece k => StateT [Text] (MaybeT Identity) k
+consumeKey = do
+  t <- attemptTakeNextPiece
+  case fromPathPiece t of
+    Nothing -> mzero
+    Just a  -> return a
+
+attemptTakeNextPiece :: StateT [b] (MaybeT Identity) b
+attemptTakeNextPiece = do
+  s <- get
+  case s of
+    (a:as) -> put as >> return a
+    [] -> mzero
+
+forceEmpty :: StateT [Text] (MaybeT Identity) ()
+forceEmpty = do
+  s <- get
+  case s of
+    [] -> return ()
+    _  -> mzero
+
 -- import ClassyPrelude.Yesod
 -- import Yesod.Core
 -- import Yesod.Core.Types

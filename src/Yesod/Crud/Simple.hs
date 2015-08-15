@@ -1,18 +1,14 @@
 module Yesod.Crud.Simple where
 
 import Prelude
-import Control.Applicative
-import Control.Monad
-import Data.Maybe
 import Data.Monoid
 import Control.Lens.TH
-import Control.Lens
+import Control.Lens hiding (index)
 
 import Yesod.Core
 import Yesod.Form
 import Yesod.Persist
 import Data.Text (Text)
-import Database.Persist hiding (get)
 
 import Yesod.Crud
 
