@@ -16,10 +16,10 @@ import Data.Proxy
 import Yesod.Crud
 
 data SimpleCrud master p c = SimpleCrud
-  { _scAdd        :: WidgetT master IO () -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
-  , _scIndex      :: p -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
-  , _scEdit       :: WidgetT master IO () -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
-  , _scDelete     :: WidgetT master IO () -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
+  { _scAdd        :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _scIndex      :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _scEdit       :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _scDelete     :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scDeleteForm :: WidgetT master IO () 
   , _scForm       :: Maybe c -> Html -> MForm (HandlerT master IO) (FormResult c, WidgetT master IO ())
   , _scFormWrap   :: Enctype -> Route master -> WidgetT master IO () -> WidgetT master IO ()
@@ -89,7 +89,7 @@ applyBasicLayoutsAndForms initial = initial
           lift $ defaultLayout $ [whamlet|$newline never
             <h1>Index
             <p>
-              <a href="@{tp (ChildAddR p)}">Add
+              <a href="@{tp (AddR p)}">Add
             <table>
               <thead>
                 <tr>
@@ -101,9 +101,9 @@ applyBasicLayoutsAndForms initial = initial
                   <tr>
                     <td>#{toPathPiece theId}
                     <td>
-                      <a href="@{tp (ChildEditR theId)}">Edit
+                      <a href="@{tp (EditR theId)}">Edit
                     <td>
-                      <a href="@{tp (ChildDeleteR theId)}">Delete
+                      <a href="@{tp (DeleteR theId)}">Delete
           |]
 
 basicSimpleCrud :: PersistCrudEntity master a => SimpleCrud master () a
@@ -119,9 +119,9 @@ simpleCrudToCrud ::
   => PersistStore (YesodPersistBackend master)
   => YesodPersist master
   => RenderMessage master FormMessage
-  => SimpleCrud master p a -> ChildCrud master p a
+  => SimpleCrud master p a -> Crud master p a
 simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb editDb) = 
-  ChildCrud addH indexH editH delH
+  Crud addH indexH editH delH
   where 
   indexH = index
   delH theId = do
@@ -132,9 +132,9 @@ simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb ed
         FormSuccess _ -> do
           p <- runDB $ delDb theId
           setMessageI ("You have deleted the resource." :: Text)
-          redirect (tp $ ChildIndexR p)
+          redirect (tp $ IndexR p)
         _ -> return ()
-    del (wrap UrlEncoded (tp $ ChildDeleteR theId) ([whamlet|<input type="hidden" value="a" name="fake">|] <> delForm))
+    del (wrap UrlEncoded (tp $ DeleteR theId) ([whamlet|<input type="hidden" value="a" name="fake">|] <> delForm))
   addH p = do 
     tp <- getRouteToParent
     (enctype,w) <- lift $ do
@@ -143,9 +143,9 @@ simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb ed
         FormSuccess a -> do
           void $ runDB $ addDb p a 
           setMessageI ("You have created a new resource." :: Text)
-          redirect (tp $ ChildIndexR p)
+          redirect (tp $ IndexR p)
         _ -> return (enctype,w)
-    add (wrap enctype (tp $ ChildAddR p) w)
+    add (wrap enctype (tp $ AddR p) w)
   editH theId = do
     tp <- getRouteToParent
     (enctype,w) <- lift $ do
@@ -155,7 +155,7 @@ simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb ed
         FormSuccess new -> do
           p <- runDB $ editDb theId new
           setMessageI ("You have updated the resource." :: Text)
-          redirect (tp $ ChildIndexR p)
+          redirect (tp $ IndexR p)
         _ -> return (enctype,w)
-    edit (wrap enctype (tp $ ChildEditR theId) w)
+    edit (wrap enctype (tp $ EditR theId) w)
 

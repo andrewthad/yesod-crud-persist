@@ -16,64 +16,62 @@ import Data.Foldable (for_)
 
 import Yesod.Crud.Internal
 
-type Crud master a = ChildCrud master () a
-
--- In ChildCrud, c is the child type, and p is the type of the identifier
+-- In Crud, c is the child type, and p is the type of the identifier
 -- for its parent.
-data ChildCrud master p c = ChildCrud
-  { _ccAdd    :: p -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
-  , _ccIndex  :: p -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
-  , _ccEdit   :: Key c -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
-  , _ccDelete :: Key c -> HandlerT (ChildCrud master p c) (HandlerT master IO) Html
+data Crud master p c = Crud
+  { _ccAdd    :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _ccIndex  :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _ccEdit   :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _ccDelete :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
   }
-makeLenses ''ChildCrud
+makeLenses ''Crud
 
 -- Dispatch for the child crud subsite
-instance (Eq (Key c), PathPiece (Key c), Eq p, PathPiece p) => YesodSubDispatch (ChildCrud master p c) (HandlerT master IO) where
+instance (Eq (Key c), PathPiece (Key c), Eq p, PathPiece p) => YesodSubDispatch (Crud master p c) (HandlerT master IO) where
   yesodSubDispatch env req = h
     where 
     h = let parsed = parseRoute (pathInfo req, []) 
             helper a = subHelper (fmap toTypedContent a) env parsed req
         in case parsed of
-          Just (ChildEditR theId)   -> onlyAllow ["GET","POST"]
+          Just (EditR theId)   -> onlyAllow ["GET","POST"]
             $ helper $ getYesod >>= (\s -> _ccEdit s theId)
-          Just (ChildDeleteR theId) -> onlyAllow ["GET","POST"] 
+          Just (DeleteR theId) -> onlyAllow ["GET","POST"] 
             $ helper $ getYesod >>= (\s -> _ccDelete s theId)
-          Just (ChildAddR p) -> onlyAllow ["GET","POST"] 
+          Just (AddR p) -> onlyAllow ["GET","POST"] 
             $ helper $ getYesod >>= (\s -> _ccAdd s p)
-          Just (ChildIndexR p) -> onlyAllow ["GET"] 
+          Just (IndexR p) -> onlyAllow ["GET"] 
             $ helper $ getYesod >>= (\s -> _ccIndex s p)
           Nothing              -> notFoundApp
     onlyAllow reqTypes waiApp = if isJust (List.find (== requestMethod req) reqTypes) then waiApp else notFoundApp
     notFoundApp = subHelper (fmap toTypedContent notFoundUnit) env Nothing req
     notFoundUnit = fmap (\() -> ()) notFound
 
-instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => RenderRoute (ChildCrud master p c) where
-  data Route (ChildCrud master p c)
-    = ChildEditR (Key c)
-    | ChildDeleteR (Key c)
-    | ChildIndexR p
-    | ChildAddR p
+instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => RenderRoute (Crud master p c) where
+  data Route (Crud master p c)
+    = EditR (Key c)
+    | DeleteR (Key c)
+    | IndexR p
+    | AddR p
   renderRoute r = noParams $ case r of
-    ChildEditR theId   -> ["edit",   toPathPiece theId]
-    ChildDeleteR theId -> ["delete", toPathPiece theId]
-    ChildIndexR p      -> ["index",  toPathPiece p]
-    ChildAddR p        -> ["add",    toPathPiece p]
+    EditR theId   -> ["edit",   toPathPiece theId]
+    DeleteR theId -> ["delete", toPathPiece theId]
+    IndexR p      -> ["index",  toPathPiece p]
+    AddR p        -> ["add",    toPathPiece p]
     where noParams xs = (xs,[])
 
-instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => ParseRoute (ChildCrud master p c) where
+instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => ParseRoute (Crud master p c) where
   parseRoute (_, (_:_)) = Nothing
   parseRoute (xs, []) = Nothing
-    <|> (runSM xs $ pure ChildEditR <* consumeMatchingText "edit" <*> consumeKey)
-    <|> (runSM xs $ pure ChildDeleteR <* consumeMatchingText "delete" <*> consumeKey)
-    <|> (runSM xs $ pure ChildIndexR <* consumeMatchingText "index" <*> consumeKey)
-    <|> (runSM xs $ pure ChildAddR <* consumeMatchingText "add" <*> consumeKey)
+    <|> (runSM xs $ pure EditR <* consumeMatchingText "edit" <*> consumeKey)
+    <|> (runSM xs $ pure DeleteR <* consumeMatchingText "delete" <*> consumeKey)
+    <|> (runSM xs $ pure IndexR <* consumeMatchingText "index" <*> consumeKey)
+    <|> (runSM xs $ pure AddR <* consumeMatchingText "add" <*> consumeKey)
 
-deriving instance (Eq (Key c), Eq p) => Eq (Route (ChildCrud master p c))
-deriving instance (Show (Key c), Show p) => Show (Route (ChildCrud master p c))
-deriving instance (Read (Key c), Read p) => Read (Route (ChildCrud master p c))
+deriving instance (Eq (Key c), Eq p) => Eq (Route (Crud master p c))
+deriving instance (Show (Key c), Show p) => Show (Route (Crud master p c))
+deriving instance (Read (Key c), Read p) => Read (Route (Crud master p c))
 
-type HierarchyCrud master a = ChildCrud master (Maybe (Key a)) a
+type HierarchyCrud master a = Crud master (Maybe (Key a)) a
 
 class (NodeTable c ~ a, ClosureTable a ~ c) => ClosureTablePair a c where
   type NodeTable c
@@ -108,6 +106,12 @@ closureDepthColAs :: forall a c. ClosureTablePair a c
   => Key a -> EntityField c Int
 closureDepthColAs _ = (closureDepthCol :: EntityField c Int)
 
+-- This includes the child itself, the root comes first
+closureGetParents :: (MonadIO m, SqlClosure a c) => Key a -> SqlPersistT m [Entity a]
+closureGetParents theId = do
+  cs <- selectList [closureDescendantCol ==. theId] [Desc closureDepthCol]
+  selectList [persistIdField <-. map (closureAncestor . entityVal) cs] []
+
 closureGetImmidiateChildren :: (MonadIO m, SqlClosure a c) 
    => Key a -> SqlPersistT m [Entity a]
 closureGetImmidiateChildren theId = do
@@ -135,4 +139,6 @@ closureInsert mparent a = do
       closureCreate (closureAncestor c) childId (closureDepth c + 1)) cs 
   return childId
 
+closureRootNodes :: (MonadIO m, SqlClosure a c) => SqlPersistT m [Entity a]
+closureRootNodes = error "Write this" -- probably with esqueleto
 
