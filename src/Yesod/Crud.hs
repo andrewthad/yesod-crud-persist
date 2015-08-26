@@ -15,6 +15,9 @@ import Database.Persist.Sql
 import Data.Foldable (for_)
 
 import Yesod.Crud.Internal
+import Data.Typeable
+import Data.Proxy
+import Unsafe.Coerce (unsafeCoerce)
 
 -- In Crud, c is the child type, and p is the type of the identifier
 -- for its parent.
@@ -25,6 +28,19 @@ data Crud master p c = Crud
   , _ccDelete :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
   }
 makeLenses ''Crud
+
+-- By using this, you will trade some type safety
+data SomeCrud master = forall p c. (Typeable p, Typeable c) => SomeCrud (Crud master p c)
+
+findCrud :: forall p c master. (Typeable p, Typeable c) => [SomeCrud master] -> Crud master p c
+findCrud = fromJust . go 
+  where
+  go (SomeCrud (crud :: Crud master p1 c1):cs) = 
+    if typeRep (Proxy :: Proxy p1) == typeRep (Proxy :: Proxy p)
+       && typeRep (Proxy :: Proxy c1) == typeRep (Proxy :: Proxy c)
+      then Just (unsafeCoerce crud)
+      else go cs
+  go [] = Nothing
 
 -- Dispatch for the child crud subsite
 instance (Eq (Key c), PathPiece (Key c), Eq p, PathPiece p) => YesodSubDispatch (Crud master p c) (HandlerT master IO) where
