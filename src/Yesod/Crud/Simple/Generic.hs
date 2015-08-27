@@ -9,6 +9,7 @@ import GHC.Generics
 import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Char (isLower)
+import Data.Either.Combinators
 
 class GCrud c where
   gcrudForm :: (MonadHandler m, RenderMessage (HandlerSite m) FormMessage) => Maybe c -> AForm m c
@@ -41,7 +42,7 @@ instance GCrudNamed Text where
 
 applyGenericForm :: (Generic c, GCrud (Rep c ()), RenderMessage master FormMessage) => SimpleCrud master p c -> SimpleCrud master p c
 applyGenericForm sc = sc
-  { _scForm = \m -> renderBootstrap3 BootstrapBasicForm $ id
+  { _scForm = \e -> let m = rightToMaybe e in renderBootstrap3 BootstrapBasicForm $ id
       <$> (fmap to (gcrudForm (fmap from' m))) 
       <*  bootstrapSubmit ("Submit" :: BootstrapSubmit Text)
   }

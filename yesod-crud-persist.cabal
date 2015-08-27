@@ -28,6 +28,7 @@ library
                      , transformers >= 0.3.0
                      , wai          >= 2.0
                      , esqueleto    >= 2.0
+                     , either
   exposed-modules:     Yesod.Crud
                      , Yesod.Crud.Simple
                      , Yesod.Crud.Simple.Generic
