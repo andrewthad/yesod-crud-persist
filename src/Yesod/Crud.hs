@@ -9,10 +9,11 @@ import Lens.Micro.TH
 import Yesod.Core
 import Database.Persist(Key)
 import Network.Wai (pathInfo, requestMethod)
-import qualified Data.List as List
 import Yesod.Persist
 import Database.Persist.Sql
 import Data.Foldable (for_)
+import qualified Data.List as List
+import qualified Database.Esqueleto as E
 
 import Yesod.Crud.Internal
 
@@ -23,6 +24,7 @@ data Crud master p c = Crud
   , _ccIndex  :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _ccEdit   :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _ccDelete :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _ccView   :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
   }
 makeLenses ''Crud
 
@@ -41,6 +43,8 @@ instance (Eq (Key c), PathPiece (Key c), Eq p, PathPiece p) => YesodSubDispatch 
             $ helper $ getYesod >>= (\s -> _ccAdd s p)
           Just (IndexR p) -> onlyAllow ["GET"] 
             $ helper $ getYesod >>= (\s -> _ccIndex s p)
+          Just (ViewR theId) -> onlyAllow ["GET"] 
+            $ helper $ getYesod >>= (\s -> _ccView s theId)
           Nothing              -> notFoundApp
     onlyAllow reqTypes waiApp = if isJust (List.find (== requestMethod req) reqTypes) then waiApp else notFoundApp
     notFoundApp = subHelper (fmap toTypedContent notFoundUnit) env Nothing req
@@ -52,11 +56,13 @@ instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => RenderRoute (Crud
     | DeleteR (Key c)
     | IndexR p
     | AddR p
+    | ViewR (Key c)
   renderRoute r = noParams $ case r of
     EditR theId   -> ["edit",   toPathPiece theId]
     DeleteR theId -> ["delete", toPathPiece theId]
     IndexR p      -> ["index",  toPathPiece p]
     AddR p        -> ["add",    toPathPiece p]
+    ViewR theId   -> ["view",   toPathPiece theId]
     where noParams xs = (xs,[])
 
 instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => ParseRoute (Crud master p c) where
@@ -66,6 +72,7 @@ instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => ParseRoute (Crud 
     <|> (runSM xs $ pure DeleteR <* consumeMatchingText "delete" <*> consumeKey)
     <|> (runSM xs $ pure IndexR <* consumeMatchingText "index" <*> consumeKey)
     <|> (runSM xs $ pure AddR <* consumeMatchingText "add" <*> consumeKey)
+    <|> (runSM xs $ pure ViewR <* consumeMatchingText "view" <*> consumeKey)
 
 deriving instance (Eq (Key c), Eq p) => Eq (Route (Crud master p c))
 deriving instance (Show (Key c), Show p) => Show (Route (Crud master p c))
@@ -106,11 +113,25 @@ closureDepthColAs :: forall a c. ClosureTablePair a c
   => Key a -> EntityField c Int
 closureDepthColAs _ = (closureDepthCol :: EntityField c Int)
 
+closureGetRootNodes :: (MonadIO m, SqlClosure a c) => SqlPersistT m [Entity a]
+closureGetRootNodes = E.select $ E.from $ \a -> do
+  E.where_ $ E.notExists $ E.from $ \c -> do
+    E.where_ $ c E.^. closureDescendantCol E.==. a E.^. persistIdField
+         E.&&. c E.^. closureDepthCol E.>. E.val 0
+  return a
+
 -- This includes the child itself, the root comes first
 closureGetParents :: (MonadIO m, SqlClosure a c) => Key a -> SqlPersistT m [Entity a]
-closureGetParents theId = do
-  cs <- selectList [closureDescendantCol ==. theId] [Desc closureDepthCol]
-  selectList [persistIdField <-. map (closureAncestor . entityVal) cs] []
+closureGetParents theId = E.select $ E.from $ \(a `E.InnerJoin` c) -> do
+  E.on $ a E.^. persistIdField E.==. c E.^. closureAncestorCol
+  E.where_ $ c E.^. closureDescendantCol E.==. E.val theId
+  E.orderBy [E.desc $ c E.^. closureDepthCol]
+  return a
+
+closureGetMaybeImmidiateChildren :: (MonadIO m, SqlClosure a c)
+  => Maybe (Key a) -> SqlPersistT m [Entity a]
+closureGetMaybeImmidiateChildren Nothing = closureGetRootNodes
+closureGetMaybeImmidiateChildren (Just k) = closureGetImmidiateChildren k
 
 closureGetImmidiateChildren :: (MonadIO m, SqlClosure a c) 
    => Key a -> SqlPersistT m [Entity a]

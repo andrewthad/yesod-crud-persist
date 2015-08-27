@@ -27,6 +27,7 @@ library
                      , text         
                      , transformers >= 0.3.0
                      , wai          >= 2.0
+                     , esqueleto    >= 2.0
   exposed-modules:     Yesod.Crud
                      , Yesod.Crud.Simple
                      , Yesod.Crud.Internal
