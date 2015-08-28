@@ -13,6 +13,7 @@ import Data.Char (isLower)
 import Database.Persist
 import Database.Persist.Sql
 import Yesod.Persist
+import Data.Either.Combinators
 
 class HasName a where
   gcrudName :: a -> Text
@@ -56,7 +57,7 @@ instance (HasName a, Eq (Key a), PathPiece (Key a), PersistEntity a, PersistEnti
 applyGenericForm :: (Yesod master, Generic c, GCrud (Rep c ()), RenderMessage master FormMessage, YesodPersist master, YesodPersistBackend master ~ SqlBackend)
   => SimpleCrud master p c -> SimpleCrud master p c
 applyGenericForm sc = sc
-  { _scForm = \m -> renderBootstrap3 BootstrapBasicForm $ id
+  { _scForm = \e -> let m = rightToMaybe e in renderBootstrap3 BootstrapBasicForm $ id
       <$> (fmap to (gcrudForm (fmap from' m))) 
       <*  bootstrapSubmit ("Submit" :: BootstrapSubmit Text)
   }

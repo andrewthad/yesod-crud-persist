@@ -18,10 +18,11 @@ import Yesod.Crud
 data SimpleCrud master p c = SimpleCrud
   { _scAdd        :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scIndex      :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
+  , _scView       :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scEdit       :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scDelete     :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scDeleteForm :: WidgetT master IO () 
-  , _scForm       :: Maybe c -> Html -> MForm (HandlerT master IO) (FormResult c, WidgetT master IO ())
+  , _scForm       :: Either p c -> Html -> MForm (HandlerT master IO) (FormResult c, WidgetT master IO ())
   , _scFormWrap   :: Enctype -> Route master -> WidgetT master IO () -> WidgetT master IO ()
   , _scDeleteDb   :: Key c -> YesodDB master p
   , _scAddDb      :: p -> c -> YesodDB master (Key c)
@@ -39,7 +40,8 @@ emptyParentlessSimpleCrud ::
   => SimpleCrud master () a
 emptyParentlessSimpleCrud = SimpleCrud 
   (const $ return mempty)  -- add 
-  (const $ return mempty)          -- index
+  (const $ return mempty)  -- index
+  (const $ return mempty)  -- view
   (const $ return mempty)  -- edit
   (const $ return mempty)  -- delete
   mempty (const $ const $ return (FormMissing,mempty)) -- delete form
@@ -47,6 +49,34 @@ emptyParentlessSimpleCrud = SimpleCrud
   delete -- default deletion, assumes no FK constraints
   (const insert) -- default DB add
   replace -- default DB edit
+
+emptyChildSimpleCrud :: 
+     PathPiece (Key a) 
+  => Yesod master
+  => YesodPersist master
+  => PersistEntity a
+  => PersistQuery (YesodPersistBackend master)
+  => PersistEntityBackend a ~ YesodPersistBackend master
+  => (Key a -> YesodDB master p) -> SimpleCrud master p a
+emptyChildSimpleCrud getParent = SimpleCrud 
+  (const $ return mempty)  -- add 
+  (const $ return mempty)  -- index
+  (const $ return mempty)  -- view
+  (const $ return mempty)  -- edit
+  (const $ return mempty)  -- delete
+  mempty (const $ const $ return (FormMissing,mempty)) -- delete form
+  (const $ const $ const mempty) -- form wrapper
+  del -- default deletion, assumes no FK constraints
+  (const insert) -- default DB add
+  edit -- default DB edit
+  where 
+  del k = do
+    p <- getParent k
+    delete k
+    return p
+  edit k v = do
+    replace k v
+    getParent k
 
 emptyHierarchySimpleCrud :: forall a c master.
      SqlBackend ~ YesodPersistBackend master
@@ -57,6 +87,7 @@ emptyHierarchySimpleCrud :: forall a c master.
 emptyHierarchySimpleCrud = SimpleCrud
   (const $ return mempty)  -- add 
   (const $ return mempty)  -- index
+  (const $ return mempty)  -- view
   (const $ return mempty)  -- edit
   (const $ return mempty)  -- delete
   mempty (const $ const $ return (FormMissing,mempty)) -- delete form
@@ -114,6 +145,9 @@ basicSimpleCrudIndex nameFunc p = do
 basicSimpleCrud :: PersistCrudEntity master a => SimpleCrud master () a
 basicSimpleCrud = applyBasicLayoutsAndForms emptyParentlessSimpleCrud
 
+basicChildSimpleCrud :: PersistCrudEntity master a => (Key a -> YesodDB master p) -> SimpleCrud master p a
+basicChildSimpleCrud f = applyBasicLayoutsAndForms (emptyChildSimpleCrud f)
+
 basicHierarchySimpleCrud :: (PersistCrudEntity master a, SqlClosure a c)
   => SimpleCrud master (Maybe (Key a)) a
 basicHierarchySimpleCrud = applyBasicLayoutsAndForms emptyHierarchySimpleCrud
@@ -125,10 +159,11 @@ simpleCrudToCrud ::
   => YesodPersist master
   => RenderMessage master FormMessage
   => SimpleCrud master p a -> Crud master p a
-simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb editDb) = 
-  Crud addH indexH editH delH
+simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb) = 
+  Crud addH indexH editH delH viewH
   where 
   indexH = index
+  viewH = view
   delH theId = do
     tp <- getRouteToParent
     lift $ do
@@ -143,7 +178,7 @@ simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb ed
   addH p = do 
     tp <- getRouteToParent
     (enctype,w) <- lift $ do
-      ((res,w),enctype) <- runFormPost (form Nothing)
+      ((res,w),enctype) <- runFormPost (form $ Left p)
       case res of
         FormSuccess a -> do
           void $ runDB $ addDb p a 
@@ -155,7 +190,7 @@ simpleCrudToCrud (SimpleCrud add index edit del delForm form wrap delDb addDb ed
     tp <- getRouteToParent
     (enctype,w) <- lift $ do
       old <- runDB $ get404 theId
-      ((res,w),enctype) <- runFormPost (form $ Just old)
+      ((res,w),enctype) <- runFormPost (form $ Right old)
       case res of
         FormSuccess new -> do
           p <- runDB $ editDb theId new
