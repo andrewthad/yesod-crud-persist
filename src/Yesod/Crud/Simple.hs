@@ -73,7 +73,7 @@ emptyHierarchySimpleCrud = SimpleCrud
 applyBasicLayoutsAndForms :: PersistCrudEntity master a
   => SimpleCrud master p a -> SimpleCrud master p a
 applyBasicLayoutsAndForms initial = initial
-  & scIndex      .~ index
+  & scIndex      .~ basicSimpleCrudIndex (toWidget . toHtml . toPathPiece . entityKey)
   & scAdd        .~ lift . defaultLayout
   & scEdit       .~ lift . defaultLayout
   & scDelete     .~ lift . defaultLayout
@@ -83,28 +83,33 @@ applyBasicLayoutsAndForms initial = initial
           <form action="@{route}" enctype="#{enctype}" method="post">
             ^{inner}
         |]
-        index p = do
-          tp <- getRouteToParent
-          as <- lift $ runDB $ selectList [] []
-          lift $ defaultLayout $ [whamlet|$newline never
-            <h1>Index
-            <p>
-              <a href="@{tp (AddR p)}">Add
-            <table>
-              <thead>
-                <tr>
-                  <th>ID
-                  <th>Edit
-                  <th>Delete
-              <tbody>
-                $forall (Entity theId _) <- as
-                  <tr>
-                    <td>#{toPathPiece theId}
-                    <td>
-                      <a href="@{tp (EditR theId)}">Edit
-                    <td>
-                      <a href="@{tp (DeleteR theId)}">Delete
-          |]
+
+basicSimpleCrudIndex :: (PersistCrudEntity site c)
+  => (Entity c -> WidgetT site IO ()) -> p -> HandlerT (Crud site p c) (HandlerT site IO) Html
+basicSimpleCrudIndex nameFunc p = do
+  tp <- getRouteToParent
+  cs <- lift $ runDB $ selectList [] []
+  lift $ defaultLayout $ [whamlet|$newline never
+    <h1>Index
+    <p>
+      <a href="@{tp (AddR p)}">Add
+    <table>
+      <thead>
+        <tr>
+          <th>ID
+          <th>Edit
+          <th>Delete
+      <tbody>
+        $forall c <- cs
+          <tr>
+            <td>^{nameFunc c}
+            <td>
+              <a href="@{tp (EditR (entityKey c))}">Edit
+            <td>
+              <a href="@{tp (DeleteR (entityKey c))}">Delete
+  |]
+
+
 
 basicSimpleCrud :: PersistCrudEntity master a => SimpleCrud master () a
 basicSimpleCrud = applyBasicLayoutsAndForms emptyParentlessSimpleCrud
