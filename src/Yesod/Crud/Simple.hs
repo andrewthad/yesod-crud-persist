@@ -124,7 +124,7 @@ basicSimpleCrudIndex nameFunc p = do
     <h1>Index
     <p>
       <a href="@{tp (AddR p)}">Add
-    <table>
+    <table.table>
       <thead>
         <tr>
           <th>ID
