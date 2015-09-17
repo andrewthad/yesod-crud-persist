@@ -64,6 +64,14 @@ applyGenericForm sc = sc
   where from' :: Generic a => a -> Rep a ()
         from' = from  -- A hack to stop the type checker from whining about p
 
+genericForm :: (Yesod master, Generic a, GCrud (Rep a ()), RenderMessage master FormMessage, YesodPersist master, YesodPersistBackend master ~ SqlBackend) 
+  => Maybe a -> Html -> MForm (HandlerT master IO) (FormResult a, WidgetT master IO ())
+genericForm m = renderBootstrap3 BootstrapBasicForm $ id
+  <$> (fmap to (gcrudForm (fmap from' m))) 
+  <*  bootstrapSubmit ("Submit" :: BootstrapSubmit Text)
+  where from' :: Generic a => a -> Rep a ()
+        from' = from  -- A hack to stop the type checker from whining about p
+
 genericIndex :: (PersistCrudEntity site c, HasName c)
   => p -> HandlerT (Crud site p c) (HandlerT site IO) Html
 genericIndex = basicSimpleCrudIndex (toWidget . toHtml . gcrudName . entityVal)
