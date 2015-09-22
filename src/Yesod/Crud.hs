@@ -12,6 +12,8 @@ import Network.Wai (pathInfo, requestMethod)
 import Yesod.Persist
 import Database.Persist.Sql
 import Data.Foldable (for_)
+import Data.Text (Text)
+import Data.Monoid
 import qualified Data.List as List
 import qualified Database.Esqueleto as E
 
@@ -30,6 +32,32 @@ data Crud master p c = Crud
   , _ccView   :: Key c -> HandlerT (Crud master p c) (HandlerT master IO) Html
   }
 makeLenses ''Crud
+
+breadcrumbsCrud :: PersistCrudEntity master c
+                => (Route (Crud master p c) -> Route master) 
+                -> Route (Crud master p c) 
+                -> Text
+                -> (c -> Text)
+                -> (Key c -> YesodDB master p)
+                -> (p -> HandlerT master IO (Maybe (Route master))) 
+                -> HandlerT master IO (Text, Maybe (Route master))
+breadcrumbsCrud tp route indexName getName getParent getIndexParent = case route of
+  AddR p -> return ("Add", Just $ tp $ IndexR p)
+  IndexR p -> do
+    indexParent <- getIndexParent p
+    return (indexName, indexParent)
+  ViewR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ getParent cid
+    return ("View - " <> getName c, Just $ tp $ IndexR p)
+  EditR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ getParent cid
+    return ("Edit - " <> getName c, Just $ tp $ IndexR p)
+  DeleteR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ getParent cid
+    return ("Delete - " <> getName c, Just $ tp $ IndexR p)
 
 -- By using this, you will trade some type safety
 data SomeCrud master = forall p c. (Typeable p, Typeable c) => SomeCrud (Crud master p c)

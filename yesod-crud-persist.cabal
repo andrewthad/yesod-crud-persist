@@ -21,6 +21,7 @@ library
                      , yesod-core   >= 1.4.11
                      , yesod-form   >= 1.2
                      , yesod-persistent >= 1.2
+                     , yesod-markdown 
                      , persistent   >= 1.2
                      , microlens    >= 0.1.0
                      , microlens-th >= 0.1.0
@@ -29,6 +30,7 @@ library
                      , wai          >= 2.0
                      , esqueleto    >= 2.0
                      , either
+                     , time
   exposed-modules:     Yesod.Crud
                      , Yesod.Crud.Simple
                      , Yesod.Crud.Simple.Generic

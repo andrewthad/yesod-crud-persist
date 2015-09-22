@@ -14,6 +14,8 @@ import Database.Persist
 import Database.Persist.Sql
 import Yesod.Persist
 import Data.Either.Combinators
+import Data.Time
+import Yesod.Markdown
 
 class HasName a where
   gcrudName :: a -> Text
@@ -45,8 +47,17 @@ instance (Selector b, GCrudNamed c) => GCrud (M1 S b (K1 R c) p) where
 class GCrudNamed c where
   gcrudFormNamed :: (Yesod site, YesodPersist site, YesodPersistBackend site ~ SqlBackend, m ~ HandlerT site IO, MonadHandler m, RenderMessage (HandlerSite m) FormMessage) => Text -> Maybe c -> AForm m c
 
+instance GCrudNamed Markdown where
+  gcrudFormNamed lbl m = areq markdownField (bfs $ Text.dropWhile isLower lbl) m
+
 instance GCrudNamed Text where
   gcrudFormNamed lbl m = areq textField (bfs $ Text.dropWhile isLower lbl) m
+
+instance GCrudNamed Day where
+  gcrudFormNamed lbl m = areq dayField (bfs $ Text.dropWhile isLower lbl) m
+
+instance GCrudNamed [Text] where
+  gcrudFormNamed lbl m = areq (convertField (Text.splitOn " ") (Text.intercalate " ") textField) (bfs $ Text.dropWhile isLower lbl) m
 
 instance GCrudNamed Int where
   gcrudFormNamed lbl m = areq intField (bfs $ Text.dropWhile isLower lbl) m
