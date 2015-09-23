@@ -59,6 +59,33 @@ breadcrumbsCrud tp route indexName getName getParent getIndexParent = case route
     p <- runDB $ getParent cid
     return ("Delete - " <> getName c, Just $ tp $ IndexR p)
 
+breadcrumbsCrudHierarchy :: (PersistCrudEntity master a, SqlClosure a c)
+  => (Route (Crud master (Maybe (Key a)) a) -> Route master) 
+  -> Route (Crud master (Maybe (Key a)) a) 
+  -> Text
+  -> Maybe (Route master)
+  -> (a -> Text)
+  -> HandlerT master IO (Text, Maybe (Route master))
+breadcrumbsCrudHierarchy tp route indexName parent getName = case route of
+  AddR p -> return ("Add", Just $ tp $ IndexR p)
+  ViewR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ closureGetParentId cid
+    return ("View - " <> getName c, Just $ tp $ IndexR p)
+  EditR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ closureGetParentId cid
+    return ("Edit - " <> getName c, Just $ tp $ IndexR p)
+  DeleteR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ closureGetParentId cid
+    return ("Delete - " <> getName c, Just $ tp $ IndexR p)
+  IndexR Nothing -> return (indexName, parent)
+  IndexR (Just cid) -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ closureGetParentId cid
+    return (getName c, Just . tp . IndexR $ p)
+
 -- By using this, you will trade some type safety
 data SomeCrud master = forall p c. (Typeable p, Typeable c) => SomeCrud (Crud master p c)
 
