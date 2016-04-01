@@ -7,9 +7,9 @@ import Data.Maybe
 import Lens.Micro.TH
 
 import Yesod.Core
-import Database.Persist(Key)
+import Database.Persist (Key)
 import Network.Wai (pathInfo, requestMethod)
-import Yesod.Persist
+import Yesod.Persist hiding (Key)
 import Database.Persist.Sql
 import Data.Foldable (for_)
 import Data.Text (Text)

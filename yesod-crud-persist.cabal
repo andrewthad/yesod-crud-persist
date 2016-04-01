@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                yesod-crud-persist
-version:             0.2.0
+version:             0.2.1
 synopsis:            Flexible CRUD subsite usable with Yesod and Persistent.
 description:         Flexible CRUD subsite usable with Yesod and Persistent.
 homepage:            https://github.com/andrewthad/yesod-crud-persist
