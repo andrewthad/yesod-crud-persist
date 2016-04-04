@@ -15,8 +15,6 @@ import Data.Proxy
 
 import Yesod.Crud
 
-data RedirectEdit = RedirectEditToView | RedirectEditToIndex
-
 data SimpleCrud master p c = SimpleCrud
   { _scAdd        :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scIndex      :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
@@ -30,7 +28,7 @@ data SimpleCrud master p c = SimpleCrud
   , _scAddDb      :: p -> c -> YesodDB master (Key c)
   , _scEditDb     :: Key c -> c -> YesodDB master p
   , _scMessageWrap  :: Html -> Html
-  , _scRedirectEdit :: RedirectEdit
+  , _scEditParent :: EditParent
   }
 makeLenses ''SimpleCrud
 
@@ -54,7 +52,7 @@ emptyParentlessSimpleCrud = SimpleCrud
   (const insert) -- default DB add
   replace -- default DB edit
   id -- default message wrap
-  RedirectEditToIndex
+  EditParentIndex
 
 emptyChildSimpleCrud :: 
      PathPiece (Key a) 
@@ -76,7 +74,7 @@ emptyChildSimpleCrud getParent = SimpleCrud
   (const insert) -- default DB add
   edit -- default DB edit
   id -- default message wrap
-  RedirectEditToIndex
+  EditParentIndex
   where 
   del k = do
     p <- getParent k
@@ -104,7 +102,7 @@ emptyHierarchySimpleCrud = SimpleCrud
   closureInsert -- default DB add
   edit -- default DB edit
   id -- default message wrap
-  RedirectEditToIndex
+  EditParentIndex
   where 
   del k = closureGetParentIdProxied (Proxy :: Proxy c) k
   edit k v = do
@@ -169,7 +167,7 @@ simpleCrudToCrud ::
   => YesodPersist master
   => RenderMessage master FormMessage
   => SimpleCrud master p a -> Crud master p a
-simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap redirectEdit) = 
+simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap editParent) = 
   Crud addH indexH editH delH viewH
   where 
   indexH = index
@@ -205,9 +203,9 @@ simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb add
         FormSuccess new -> do
           p <- runDB $ editDb theId new
           setMessage $ messageWrap "You have updated the resource."
-          redirect $ tp $ case redirectEdit of
-            RedirectEditToView  -> ViewR theId
-            RedirectEditToIndex -> IndexR p
+          redirect $ tp $ case editParent of
+            EditParentView  -> ViewR theId
+            EditParentIndex -> IndexR p
         _ -> return (enctype,w)
     edit (wrap enctype (tp $ EditR theId) w)
 

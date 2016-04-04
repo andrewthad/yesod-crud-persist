@@ -33,15 +33,18 @@ data Crud master p c = Crud
   }
 makeLenses ''Crud
 
-breadcrumbsCrud2 :: PersistCrudEntity master c
-  => (Route (Crud master p c) -> Route master) 
+data EditParent = EditParentView | EditParentIndex
+
+breadcrumbsCrud' :: PersistCrudEntity master c
+  => EditParent
+  -> (Route (Crud master p c) -> Route master) 
   -> Route (Crud master p c) 
   -> Text
   -> (Entity c -> Text)
   -> (Key c -> YesodDB master p)
   -> (p -> HandlerT master IO (Maybe (Route master))) 
   -> HandlerT master IO (Text, Maybe (Route master))
-breadcrumbsCrud2 tp route indexName getName getParent getIndexParent = case route of
+breadcrumbsCrud' editParent tp route indexName getName getParent getIndexParent = case route of
   AddR p -> return ("Add", Just $ tp $ IndexR p)
   IndexR p -> do
     indexParent <- getIndexParent p
@@ -50,34 +53,34 @@ breadcrumbsCrud2 tp route indexName getName getParent getIndexParent = case rout
     c <- runDB $ get404 cid
     p <- runDB $ getParent cid
     return (getName (Entity cid c), Just $ tp $ IndexR p)
-  EditR cid -> return ("Edit", Just $ tp $ ViewR cid)
+  EditR cid -> case editParent of
+    EditParentView  -> return ("Edit", Just $ tp $ ViewR cid)
+    EditParentIndex -> do
+      c <- runDB $ get404 cid
+      p <- runDB $ getParent cid
+      return ("Edit - " <> getName (Entity cid c), Just $ tp $ IndexR p)
   DeleteR cid -> return ("Delete", Just $ tp $ ViewR cid)
 
-breadcrumbsCrud :: PersistCrudEntity master c
-                => (Route (Crud master p c) -> Route master) 
-                -> Route (Crud master p c) 
-                -> Text
-                -> (c -> Text)
-                -> (Key c -> YesodDB master p)
-                -> (p -> HandlerT master IO (Maybe (Route master))) 
-                -> HandlerT master IO (Text, Maybe (Route master))
-breadcrumbsCrud tp route indexName getName getParent getIndexParent = case route of
-  AddR p -> return ("Add", Just $ tp $ IndexR p)
-  IndexR p -> do
-    indexParent <- getIndexParent p
-    return (indexName, indexParent)
-  ViewR cid -> do
-    c <- runDB $ get404 cid
-    p <- runDB $ getParent cid
-    return ("View - " <> getName c, Just $ tp $ IndexR p)
-  EditR cid -> do
-    c <- runDB $ get404 cid
-    p <- runDB $ getParent cid
-    return ("Edit - " <> getName c, Just $ tp $ IndexR p)
-  DeleteR cid -> do
-    c <- runDB $ get404 cid
-    p <- runDB $ getParent cid
-    return ("Delete - " <> getName c, Just $ tp $ IndexR p)
+breadcrumbsCrud2 :: PersistCrudEntity master c
+  => (Route (Crud master p c) -> Route master) 
+  -> Route (Crud master p c) 
+  -> Text
+  -> (Entity c -> Text)
+  -> (Key c -> YesodDB master p)
+  -> (p -> HandlerT master IO (Maybe (Route master))) 
+  -> HandlerT master IO (Text, Maybe (Route master))
+breadcrumbsCrud2 = breadcrumbsCrud' EditParentView
+
+breadcrumbsCrud :: 
+     PersistCrudEntity master c
+  => (Route (Crud master p c) -> Route master) 
+  -> Route (Crud master p c) 
+  -> Text
+  -> (Entity c -> Text)
+  -> (Key c -> YesodDB master p)
+  -> (p -> HandlerT master IO (Maybe (Route master))) 
+  -> HandlerT master IO (Text, Maybe (Route master))
+breadcrumbsCrud = breadcrumbsCrud' EditParentIndex
 
 breadcrumbsCrudHierarchy :: (PersistCrudEntity master a, SqlClosure a c)
   => (Route (Crud master (Maybe (Key a)) a) -> Route master) 
