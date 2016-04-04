@@ -42,12 +42,12 @@ breadcrumbsCrud' :: PersistCrudEntity master c
   -> Text
   -> (Entity c -> Text)
   -> (Key c -> YesodDB master p)
-  -> (p -> HandlerT master IO (Maybe (Route master))) 
+  -> (p -> YesodDB master (Maybe (Route master))) 
   -> HandlerT master IO (Text, Maybe (Route master))
 breadcrumbsCrud' editParent tp route indexName getName getParent getIndexParent = case route of
   AddR p -> return ("Add", Just $ tp $ IndexR p)
   IndexR p -> do
-    indexParent <- getIndexParent p
+    indexParent <- runDB $ getIndexParent p
     return (indexName, indexParent)
   ViewR cid -> do
     c <- runDB $ get404 cid
@@ -67,7 +67,7 @@ breadcrumbsCrud2 :: PersistCrudEntity master c
   -> Text
   -> (Entity c -> Text)
   -> (Key c -> YesodDB master p)
-  -> (p -> HandlerT master IO (Maybe (Route master))) 
+  -> (p -> YesodDB master (Maybe (Route master))) 
   -> HandlerT master IO (Text, Maybe (Route master))
 breadcrumbsCrud2 = breadcrumbsCrud' EditParentView
 
@@ -78,7 +78,7 @@ breadcrumbsCrud ::
   -> Text
   -> (Entity c -> Text)
   -> (Key c -> YesodDB master p)
-  -> (p -> HandlerT master IO (Maybe (Route master))) 
+  -> (p -> YesodDB master (Maybe (Route master))) 
   -> HandlerT master IO (Text, Maybe (Route master))
 breadcrumbsCrud = breadcrumbsCrud' EditParentIndex
 
