@@ -33,6 +33,26 @@ data Crud master p c = Crud
   }
 makeLenses ''Crud
 
+breadcrumbsCrud2 :: PersistCrudEntity master c
+  => (Route (Crud master p c) -> Route master) 
+  -> Route (Crud master p c) 
+  -> Text
+  -> (Entity c -> Text)
+  -> (Key c -> YesodDB master p)
+  -> (p -> HandlerT master IO (Maybe (Route master))) 
+  -> HandlerT master IO (Text, Maybe (Route master))
+breadcrumbsCrud2 tp route indexName getName getParent getIndexParent = case route of
+  AddR p -> return ("Add", Just $ tp $ IndexR p)
+  IndexR p -> do
+    indexParent <- getIndexParent p
+    return (indexName, indexParent)
+  ViewR cid -> do
+    c <- runDB $ get404 cid
+    p <- runDB $ getParent cid
+    return (getName (Entity cid c), Just $ tp $ IndexR p)
+  EditR cid -> return ("Edit", Just $ tp $ ViewR cid)
+  DeleteR cid -> return ("Delete", Just $ tp $ ViewR cid)
+
 breadcrumbsCrud :: PersistCrudEntity master c
                 => (Route (Crud master p c) -> Route master) 
                 -> Route (Crud master p c) 
