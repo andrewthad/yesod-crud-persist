@@ -15,6 +15,8 @@ import Data.Proxy
 
 import Yesod.Crud
 
+data RedirectEdit = RedirectEditToView | RedirectEditToIndex
+
 data SimpleCrud master p c = SimpleCrud
   { _scAdd        :: WidgetT master IO () -> HandlerT (Crud master p c) (HandlerT master IO) Html
   , _scIndex      :: p -> HandlerT (Crud master p c) (HandlerT master IO) Html
@@ -27,6 +29,8 @@ data SimpleCrud master p c = SimpleCrud
   , _scDeleteDb   :: Key c -> YesodDB master p
   , _scAddDb      :: p -> c -> YesodDB master (Key c)
   , _scEditDb     :: Key c -> c -> YesodDB master p
+  , _scMessageWrap  :: Html -> Html
+  , _scRedirectEdit :: RedirectEdit
   }
 makeLenses ''SimpleCrud
 
@@ -49,6 +53,8 @@ emptyParentlessSimpleCrud = SimpleCrud
   delete -- default deletion, assumes no FK constraints
   (const insert) -- default DB add
   replace -- default DB edit
+  id -- default message wrap
+  RedirectEditToIndex
 
 emptyChildSimpleCrud :: 
      PathPiece (Key a) 
@@ -69,6 +75,8 @@ emptyChildSimpleCrud getParent = SimpleCrud
   del -- default deletion, assumes no FK constraints
   (const insert) -- default DB add
   edit -- default DB edit
+  id -- default message wrap
+  RedirectEditToIndex
   where 
   del k = do
     p <- getParent k
@@ -95,6 +103,8 @@ emptyHierarchySimpleCrud = SimpleCrud
   del -- deletion
   closureInsert -- default DB add
   edit -- default DB edit
+  id -- default message wrap
+  RedirectEditToIndex
   where 
   del k = closureGetParentIdProxied (Proxy :: Proxy c) k
   edit k v = do
@@ -159,7 +169,7 @@ simpleCrudToCrud ::
   => YesodPersist master
   => RenderMessage master FormMessage
   => SimpleCrud master p a -> Crud master p a
-simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb) = 
+simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap redirectEdit) = 
   Crud addH indexH editH delH viewH
   where 
   indexH = index
@@ -171,7 +181,7 @@ simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb add
       case res of
         FormSuccess _ -> do
           p <- runDB $ delDb theId
-          setMessageI ("You have deleted the resource." :: Text)
+          setMessage $ messageWrap "You have deleted the resource."
           redirect (tp $ IndexR p)
         _ -> return ()
     del (wrap UrlEncoded (tp $ DeleteR theId) ([whamlet|<input type="hidden" value="a" name="fake">|] <> delForm))
@@ -182,7 +192,7 @@ simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb add
       case res of
         FormSuccess a -> do
           void $ runDB $ addDb p a 
-          setMessageI ("You have created a new resource." :: Text)
+          setMessage $ messageWrap "You have created a new resource"
           redirect (tp $ IndexR p)
         _ -> return (enctype,w)
     add (wrap enctype (tp $ AddR p) w)
@@ -194,8 +204,10 @@ simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb add
       case res of
         FormSuccess new -> do
           p <- runDB $ editDb theId new
-          setMessageI ("You have updated the resource." :: Text)
-          redirect (tp $ IndexR p)
+          setMessage $ messageWrap "You have updated the resource."
+          redirect $ tp $ case redirectEdit of
+            RedirectEditToView  -> ViewR theId
+            RedirectEditToIndex -> IndexR p
         _ -> return (enctype,w)
     edit (wrap enctype (tp $ EditR theId) w)
 
