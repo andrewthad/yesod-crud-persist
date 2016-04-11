@@ -1,8 +1,8 @@
-module Yesod.Crud.Simple.Generic where
+module Yesod.OldCrud.Simple.Generic where
 
 import Prelude
-import Yesod.Crud
-import Yesod.Crud.Simple
+import Yesod.OldCrud
+import Yesod.OldCrud.Simple
 import Yesod.Core
 import Yesod.Form
 import Yesod.Form.Bootstrap3

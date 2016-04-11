@@ -1,4 +1,4 @@
-module Yesod.Crud.Internal where
+module Yesod.OldCrud.Internal where
 
 import Control.Monad.Trans.State (StateT, evalStateT, put, get)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
