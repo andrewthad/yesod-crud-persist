@@ -119,9 +119,9 @@ basicSimpleCrud tp = applyBasicLayoutsAndForms (emptyParentlessSimpleCrud tp)
 basicChildSimpleCrud :: PersistCrudEntity site c => (CrudRoute p c -> Route site) -> (Key c -> YesodDB site p) -> SimpleCrud site p c
 basicChildSimpleCrud tp f = applyBasicLayoutsAndForms (emptyChildSimpleCrud tp f)
 
-simpleCrudToCrud :: (PersistCrudEntity site c, RenderMessage site FormMessage) 
+toCrudHandler :: (PersistCrudEntity site c, RenderMessage site FormMessage) 
   => SimpleCrud site p c -> CrudHandler site p c
-simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap editParent tp) = 
+toCrudHandler (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap editParent tp) = 
   CrudHandler addH indexH editH delH viewH
   where 
   indexH = index
