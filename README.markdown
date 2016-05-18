@@ -23,7 +23,7 @@ defined as follows:
       | DeleteR (Key c)
       | ViewR (Key c)
 
-In these data type, the type variables should be read as:
+In these data types, the type variables should be read as:
 
 - `site`: Your site type, probably `App`
 - `p`: The parent resources ID. This will sometimes be a database key (like `PersonId`).
