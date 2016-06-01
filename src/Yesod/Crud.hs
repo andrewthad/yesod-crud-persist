@@ -102,3 +102,77 @@ type PersistCrudEntity site a =
   , PersistQuery (YesodPersistBackend site)
   , PersistEntityBackend a ~ YesodPersistBackend site
   )
+
+class (NodeTable c ~ a, ClosureTable a ~ c) => ClosureTablePair a c where
+  type NodeTable c
+  type ClosureTable a
+  closureAncestorCol :: EntityField c (Key a)
+  closureDescendantCol :: EntityField c (Key a)
+  closureDepthCol :: EntityField c Int
+  closureAncestor :: c -> Key a
+  closureDescendant :: c -> Key a
+  closureDepth :: c -> Int
+  closureCreate :: Key a -> Key a -> Int -> c
+
+type SqlClosure a c = 
+  ( ClosureTablePair a c
+  , PersistEntityBackend a ~ SqlBackend
+  , PersistEntityBackend (ClosureTable a) ~ SqlBackend
+  , PersistEntity a
+  , PersistEntity c
+  , PersistField (Key a)
+  )
+
+closureDepthColAs :: forall a c. ClosureTablePair a c 
+  => Key a -> EntityField c Int
+closureDepthColAs _ = (closureDepthCol :: EntityField c Int)
+
+closureGetRootNodes :: (MonadIO m, SqlClosure a c) => SqlPersistT m [Entity a]
+closureGetRootNodes = E.select $ E.from $ \a -> do
+  E.where_ $ E.notExists $ E.from $ \c -> do
+    E.where_ $ c E.^. closureDescendantCol E.==. a E.^. persistIdField
+         E.&&. c E.^. closureDepthCol E.>. E.val 0
+  return a
+
+-- This includes the child itself, the root comes first
+closureGetParents :: (MonadIO m, SqlClosure a c) => Key a -> SqlPersistT m [Entity a]
+closureGetParents theId = E.select $ E.from $ \(a `E.InnerJoin` c) -> do
+  E.on $ a E.^. persistIdField E.==. c E.^. closureAncestorCol
+  E.where_ $ c E.^. closureDescendantCol E.==. E.val theId
+  E.orderBy [E.desc $ c E.^. closureDepthCol]
+  return a
+
+closureGetMaybeImmidiateChildren :: (MonadIO m, SqlClosure a c)
+  => Maybe (Key a) -> SqlPersistT m [Entity a]
+closureGetMaybeImmidiateChildren Nothing = closureGetRootNodes
+closureGetMaybeImmidiateChildren (Just k) = closureGetImmidiateChildren k
+
+closureGetImmidiateChildren :: (MonadIO m, SqlClosure a c) 
+   => Key a -> SqlPersistT m [Entity a]
+closureGetImmidiateChildren theId = do
+  cs <- selectList [closureAncestorCol ==. theId, closureDepthCol ==. 1] []
+  selectList [persistIdField <-. map (closureDescendant . entityVal) cs] [Asc persistIdField]
+
+closureGetParentId :: (MonadIO m, SqlClosure a c) 
+   => Key a -> SqlPersistT m (Maybe (Key a))
+closureGetParentId theId = do
+  cs <- selectList [closureDescendantCol ==. theId, closureDepthCol ==. 1] []
+  return $ fmap (closureAncestor . entityVal) $ listToMaybe cs
+
+closureGetParentIdProxied :: (MonadIO m, SqlClosure a c) 
+   => p c -> Key a -> SqlPersistT m (Maybe (Key a))
+closureGetParentIdProxied _ = closureGetParentId
+
+closureInsert :: forall m a c. (MonadIO m, SqlClosure a c) 
+  => Maybe (Key a) -> a -> SqlPersistT m (Key a)
+closureInsert mparent a = do
+  childId <- insert a
+  _ <- insert $ closureCreate childId childId 0 
+  for_ mparent $ \parentId -> do
+    cs <- selectList [closureDescendantCol ==. parentId] []
+    insertMany_ $ map (\(Entity _ c) -> 
+      closureCreate (closureAncestor c) childId (closureDepth c + 1)) cs 
+  return childId
+
+closureRootNodes :: (MonadIO m, SqlClosure a c) => SqlPersistT m [Entity a]
+closureRootNodes = error "Write this" -- probably with esqueleto

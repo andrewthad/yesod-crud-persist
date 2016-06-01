@@ -75,6 +75,30 @@ emptyChildSimpleCrud tp getParent = SimpleCrud
     replace k v
     getParent k
 
+emptyHierarchySimpleCrud :: forall a c site.
+  (PersistCrudEntity site a, SqlClosure a c)
+  => (CrudRoute (Maybe (Key a)) a -> Route site)
+  -> SimpleCrud site (Maybe (Key a)) a 
+emptyHierarchySimpleCrud tp = SimpleCrud
+  (const $ return mempty)  -- add 
+  (const $ return mempty)  -- index
+  (const $ return mempty)  -- view
+  (const $ return mempty)  -- edit
+  (const $ return mempty)  -- delete
+  mempty (const $ const $ return (FormMissing,mempty)) -- delete form
+  (const $ const $ const mempty) -- form wrapper
+  del -- deletion
+  closureInsert -- default DB add
+  edit -- default DB edit
+  id -- default message wrap
+  EditParentIndex
+  tp
+  where 
+  del k = closureGetParentIdProxied (Proxy :: Proxy c) k
+  edit k v = do
+    replace k v
+    closureGetParentIdProxied (Proxy :: Proxy c) k
+
 applyBasicLayoutsAndForms :: PersistCrudEntity site a
   => SimpleCrud site p a -> SimpleCrud site p a
 applyBasicLayoutsAndForms initial = initial
@@ -88,6 +112,12 @@ applyBasicLayoutsAndForms initial = initial
           <form action="@{route}" enctype="#{enctype}" method="post">
             ^{inner}
         |]
+
+basicHierarchySimpleCrud :: (PersistCrudEntity site a, SqlClosure a c)
+  => (CrudRoute (Maybe (Key a)) a -> Route site) 
+  -> SimpleCrud site (Maybe (Key a)) a
+basicHierarchySimpleCrud tp = 
+  applyBasicLayoutsAndForms (emptyHierarchySimpleCrud tp)
 
 basicSimpleCrudIndex :: (PersistCrudEntity site c)
   => (CrudRoute p c -> Route site) -> (Entity c -> WidgetT site IO ()) -> p -> HandlerT site IO Html
