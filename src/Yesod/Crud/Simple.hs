@@ -29,7 +29,7 @@ data SimpleCrud site p c = SimpleCrud
   , _scEditDb       :: Key c -> c -> YesodDB site p
   , _scMessageWrap  :: Html -> Html
   , _scEditParent   :: EditParent
-  , _scAddParent    :: AddParent site p
+  , _scViewParent   :: ViewParent site p
   , _scPromoteRoute :: CrudRoute p c -> Route site
   }
 makeLenses ''SimpleCrud
@@ -49,7 +49,7 @@ emptyParentlessSimpleCrud tp = SimpleCrud
   replace -- default DB edit
   id -- default message wrap
   EditParentIndex
-  AddParentIndex
+  ViewParentIndex
   tp
 
 emptyChildSimpleCrud :: PersistCrudEntity site c
@@ -67,7 +67,7 @@ emptyChildSimpleCrud tp getParent = SimpleCrud
   edit -- default DB edit
   id -- default message wrap
   EditParentIndex
-  AddParentIndex
+  ViewParentIndex
   tp 
   where 
   del k = do
@@ -95,7 +95,7 @@ emptyHierarchySimpleCrud tp = SimpleCrud
   edit -- default DB edit
   id -- default message wrap
   EditParentIndex
-  AddParentIndex
+  ViewParentIndex
   tp
   where 
   del k = closureGetParentIdProxied (Proxy :: Proxy c) k
@@ -177,8 +177,8 @@ toCrudHandler (SimpleCrud add index view edit del delForm form wrap delDb addDb 
           void $ runDB $ addDb p a 
           setMessage $ messageWrap "You have created a new resource"
           redirect $ case addParent of
-            AddParentIndex -> tp $ IndexR p
-            AddParentOther f -> f p
+            ViewParentIndex -> tp $ IndexR p
+            ViewParentOther f -> f p
         _ -> return (enctype,w)
     add (wrap enctype (tp $ AddR p) w)
   editH theId = do
