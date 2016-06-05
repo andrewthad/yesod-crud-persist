@@ -29,6 +29,7 @@ data SimpleCrud site p c = SimpleCrud
   , _scEditDb       :: Key c -> c -> YesodDB site p
   , _scMessageWrap  :: Html -> Html
   , _scEditParent   :: EditParent
+  , _scAddParent    :: AddParent site p
   , _scPromoteRoute :: CrudRoute p c -> Route site
   }
 makeLenses ''SimpleCrud
@@ -48,6 +49,7 @@ emptyParentlessSimpleCrud tp = SimpleCrud
   replace -- default DB edit
   id -- default message wrap
   EditParentIndex
+  AddParentIndex
   tp
 
 emptyChildSimpleCrud :: PersistCrudEntity site c
@@ -65,6 +67,7 @@ emptyChildSimpleCrud tp getParent = SimpleCrud
   edit -- default DB edit
   id -- default message wrap
   EditParentIndex
+  AddParentIndex
   tp 
   where 
   del k = do
@@ -92,6 +95,7 @@ emptyHierarchySimpleCrud tp = SimpleCrud
   edit -- default DB edit
   id -- default message wrap
   EditParentIndex
+  AddParentIndex
   tp
   where 
   del k = closureGetParentIdProxied (Proxy :: Proxy c) k
@@ -151,7 +155,7 @@ basicChildSimpleCrud tp f = applyBasicLayoutsAndForms (emptyChildSimpleCrud tp f
 
 toCrudHandler :: (PersistCrudEntity site c, RenderMessage site FormMessage) 
   => SimpleCrud site p c -> CrudHandler site p c
-toCrudHandler (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap editParent tp) = 
+toCrudHandler (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap editParent addParent tp) = 
   CrudHandler addH indexH editH delH viewH
   where 
   indexH = index
@@ -172,7 +176,9 @@ toCrudHandler (SimpleCrud add index view edit del delForm form wrap delDb addDb 
         FormSuccess a -> do
           void $ runDB $ addDb p a 
           setMessage $ messageWrap "You have created a new resource"
-          redirect (tp $ IndexR p)
+          redirect $ case addParent of
+            AddParentIndex -> tp $ IndexR p
+            AddParentOther f -> f p
         _ -> return (enctype,w)
     add (wrap enctype (tp $ AddR p) w)
   editH theId = do

@@ -46,6 +46,10 @@ data ViewParent site p c
   = ViewParentIndex 
   | ViewParentOther (p -> Key c -> Route site)
 
+data AddParent site p
+  = AddParentIndex
+  | AddParentOther (p -> Route site)
+
 handleCrud :: CrudHandler site p c -> CrudRoute p c -> HandlerT site IO Html
 handleCrud (CrudHandler add index edit delete view) route = case route of
   AddR    p -> add p
@@ -70,6 +74,7 @@ instance (PathPiece (Key c), Eq (Key c), PathPiece p, Eq p) => PathMultiPiece (C
 
 breadcrumbsCrud :: PersistCrudEntity site c
   => EditParent
+  -> AddParent site p
   -> ViewParent site p c
   -> (CrudRoute p c -> Route site) 
   -> CrudRoute p c
@@ -78,8 +83,12 @@ breadcrumbsCrud :: PersistCrudEntity site c
   -> (Key c -> YesodDB site p)
   -> (p -> YesodDB site (Maybe (Route site))) 
   -> HandlerT site IO (Text, Maybe (Route site))
-breadcrumbsCrud editParent viewParent tp route indexName getName getParent getIndexParent = case route of
-  AddR p -> return ("Add", Just $ tp $ IndexR p)
+breadcrumbsCrud editParent addParent viewParent tp route indexName getName getParent getIndexParent = case route of
+  AddR p -> 
+    let route = case addParent of
+          AddParentIndex -> tp $ IndexR p
+          AddParentOther f -> f p
+     in return ("Add", Just route)
   IndexR p -> do
     indexParent <- runDB $ getIndexParent p
     return (indexName, indexParent)
