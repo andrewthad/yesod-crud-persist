@@ -39,6 +39,7 @@ emptyParentlessSimpleCrud ::
   => PersistEntity a
   => PersistQuery (YesodPersistBackend master)
   => PersistEntityBackend a ~ YesodPersistBackend master
+  => BaseBackend (YesodPersistBackend master) ~ YesodPersistBackend master
   => SimpleCrud master () a
 emptyParentlessSimpleCrud = SimpleCrud 
   (const $ return mempty)  -- add 
@@ -61,6 +62,7 @@ emptyChildSimpleCrud ::
   => PersistEntity a
   => PersistQuery (YesodPersistBackend master)
   => PersistEntityBackend a ~ YesodPersistBackend master
+  => BaseBackend (YesodPersistBackend master) ~ YesodPersistBackend master
   => (Key a -> YesodDB master p) -> SimpleCrud master p a
 emptyChildSimpleCrud getParent = SimpleCrud 
   (const $ return mempty)  -- add 
@@ -166,6 +168,7 @@ simpleCrudToCrud ::
   => PersistStore (YesodPersistBackend master)
   => YesodPersist master
   => RenderMessage master FormMessage
+  => BaseBackend (YesodPersistBackend master) ~ YesodPersistBackend master
   => SimpleCrud master p a -> Crud master p a
 simpleCrudToCrud (SimpleCrud add index view edit del delForm form wrap delDb addDb editDb messageWrap editParent) = 
   Crud addH indexH editH delH viewH

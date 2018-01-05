@@ -113,6 +113,7 @@ type PersistCrudEntity site a =
   , PersistEntity a
   , PersistQuery (YesodPersistBackend site)
   , PersistEntityBackend a ~ YesodPersistBackend site
+  , BaseBackend (YesodPersistBackend site) ~ YesodPersistBackend site
   )
 
 class (NodeTable c ~ a, ClosureTable a ~ c) => ClosureTablePair a c where

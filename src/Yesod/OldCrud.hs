@@ -192,6 +192,7 @@ type PersistCrudEntity master a =
   , PersistEntity a
   , PersistQuery (YesodPersistBackend master)
   , PersistEntityBackend a ~ YesodPersistBackend master
+  , PersistEntityBackend a ~ BaseBackend (YesodPersistBackend master)
   )
 
 type SqlClosure a c = 
