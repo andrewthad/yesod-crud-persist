@@ -14,13 +14,19 @@ import Database.Persist.Sql
 import Data.Foldable (for_)
 import Data.Text (Text)
 import Data.Monoid
+import Data.Functor.Identity
+import Control.Monad
 import qualified Data.List as List
 import qualified Database.Esqueleto as E
 
-import Yesod.OldCrud.Internal
 import Data.Typeable
 import Data.Proxy
 import Unsafe.Coerce (unsafeCoerce)
+
+import Control.Monad.Trans.State.Strict (StateT, evalStateT)
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+
+import qualified Control.Monad.Trans.State.Strict as S
 
 -- In Crud, c is the child type, and p is the type of the identifier
 -- for its parent.
@@ -189,3 +195,33 @@ closureInsert mparent a = do
 
 closureRootNodes :: (MonadIO m, SqlClosure a c) => SqlPersistT m [Entity a]
 closureRootNodes = error "Write this" -- probably with esqueleto
+
+runSM :: [Text] -> StateT [Text] (MaybeT Identity) a -> Maybe a
+runSM xs a = runIdentity $ runMaybeT $ evalStateT (a <* forceEmpty) xs
+
+consumeMatchingText :: Text -> StateT [Text] (MaybeT Identity) ()
+consumeMatchingText t = do
+  p <- attemptTakeNextPiece
+  guard $ p == t
+
+consumeKey :: PathPiece k => StateT [Text] (MaybeT Identity) k
+consumeKey = do
+  t <- attemptTakeNextPiece
+  case fromPathPiece t of
+    Nothing -> mzero
+    Just a  -> return a
+
+attemptTakeNextPiece :: StateT [b] (MaybeT Identity) b
+attemptTakeNextPiece = do
+  s <- S.get
+  case s of
+    (a:as) -> S.put as >> return a
+    [] -> mzero
+
+forceEmpty :: StateT [Text] (MaybeT Identity) ()
+forceEmpty = do
+  s <- S.get
+  case s of
+    [] -> return ()
+    _  -> mzero
+

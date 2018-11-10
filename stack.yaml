@@ -3,5 +3,8 @@ flags:
 packages:
 - '.'
 extra-deps: 
-- 'yesod-markdown-0.11.4'
-resolver: lts-9.21
+- github: 'bitemyapp/esqueleto'                                     
+  commit: '434f81ed41795e3dd0754dbc5c75c4ed098631b3'                
+- github: 'pbrisbin/yesod-markdown'                                 
+  commit: '6cb01515f3955b41e6d4b1ae585c32f295277920'                
+resolver: lts-12.17

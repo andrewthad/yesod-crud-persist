@@ -1,7 +1,6 @@
 module Yesod.Crud.Simple where
 
 import Prelude
-import Data.Monoid
 import Lens.Micro
 import Lens.Micro.TH
 
@@ -16,14 +15,14 @@ import Data.Proxy
 import Yesod.Crud
 
 data SimpleCrud site p c = SimpleCrud
-  { _scAdd          :: WidgetT site IO () -> HandlerT site IO Html
-  , _scIndex        :: p -> HandlerT site IO Html
-  , _scView         :: Key c -> HandlerT site IO Html
-  , _scEdit         :: WidgetT site IO () -> HandlerT site IO Html
-  , _scDelete       :: WidgetT site IO () -> HandlerT site IO Html
-  , _scDeleteForm   :: WidgetT site IO () 
-  , _scForm         :: Either p c -> Html -> MForm (HandlerT site IO) (FormResult c, WidgetT site IO ())
-  , _scFormWrap     :: Enctype -> Route site -> WidgetT site IO () -> WidgetT site IO ()
+  { _scAdd          :: WidgetFor site () -> HandlerFor site Html
+  , _scIndex        :: p -> HandlerFor site Html
+  , _scView         :: Key c -> HandlerFor site Html
+  , _scEdit         :: WidgetFor site () -> HandlerFor site Html
+  , _scDelete       :: WidgetFor site () -> HandlerFor site Html
+  , _scDeleteForm   :: WidgetFor site () 
+  , _scForm         :: Either p c -> Html -> MForm (HandlerFor site) (FormResult c, WidgetFor site ())
+  , _scFormWrap     :: Enctype -> Route site -> WidgetFor site () -> WidgetFor site ()
   , _scDeleteDb     :: Key c -> YesodDB site p
   , _scAddDb        :: p -> c -> YesodDB site (Key c)
   , _scEditDb       :: Key c -> c -> YesodDB site p
@@ -124,7 +123,7 @@ basicHierarchySimpleCrud tp =
   applyBasicLayoutsAndForms (emptyHierarchySimpleCrud tp)
 
 basicSimpleCrudIndex :: (PersistCrudEntity site c)
-  => (CrudRoute p c -> Route site) -> (Entity c -> WidgetT site IO ()) -> p -> HandlerT site IO Html
+  => (CrudRoute p c -> Route site) -> (Entity c -> WidgetFor site ()) -> p -> HandlerFor site Html
 basicSimpleCrudIndex tp nameFunc p = do
   cs <- runDB $ selectList [] []
   defaultLayout $ [whamlet|$newline never
